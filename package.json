@@ -1,0 +1,33 @@
+{
+  "name": "allybanktakehome",
+  "version": "1.0.0",
+  "description": "Welcome! This repository contains a take-home backend API assessment designed to evaluate your API design, data modeling, system architecture, and testing skills.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/server.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joseph-McGarry/AllyBankTakeHome.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Joseph-McGarry/AllyBankTakeHome/issues"
+  },
+  "homepage": "https://github.com/Joseph-McGarry/AllyBankTakeHome#readme",
+  "dependencies": {
+    "graphql": "^16.13.0",
+    "graphql-yoga": "^5.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
+    "tsc": "^2.0.4",
+    "typescript": "^5.9.3"
+  }
+}
