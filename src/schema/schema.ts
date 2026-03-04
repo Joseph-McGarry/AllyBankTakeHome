@@ -3,17 +3,18 @@ import { createSchema } from 'graphql-yoga'
 export const schema = createSchema({
   typeDefs: /* GraphQL */ `
     type Query {
-      nasaSearch(q: String!, mediaType: String = "image", page: Int = 1): [NasaSearchResult!]!
+      nasaSearch(q: String!, mediaType: String = "image", page: Int = 1, keywords: [String], yearStart: String, yearEnd: String, dateCreated: String): [NasaSearchResult!]!
       searchAsset(nasaId: ID!): NasaAssetResult
     }
 
     type NasaSearchResult {
       nasaId: ID!
       title: String
-      description: String
+      mediaType: String
+      keywords: [String]
+      yearStart: String
+      yearEnd: String
       dateCreated: String
-      center: String
-      thumbnail: String
     }
 
     type NasaAssetResult {
@@ -28,12 +29,41 @@ export const schema = createSchema({
   resolvers: {
     Query: {
 
-      // resolver for searching NASA's media library using the /search endpoint
-      nasaSearch: async (_: unknown, args: { q: string; mediaType?: string; page?: number }) => {
+      // resolver for searching NASA's media library using the /search endpoint with
+      // support for pagination, media type, keywords, and year range filters
+      nasaSearch: async (
+        _: unknown, args: {
+          q: string;
+          mediaType?: string;
+          page?:number;
+          keywords?: string[];
+          yearStart?: string;
+          yearEnd?: string;
+        }
+      ) => {
+      
       const url = new URL('https://images-api.nasa.gov/search')
+      
         url.searchParams.set('q', args.q)
         url.searchParams.set('media_type', args.mediaType ?? 'image')
         url.searchParams.set('page', String(args.page ?? 1))
+
+        // sanitize and add keywords filter if provided
+        const keywords = (args.keywords ?? []).map(k => k.trim()).filter(Boolean)
+        if (keywords.length > 0) {
+          url.searchParams.set('keywords', keywords.join(','))
+        }
+
+        // sanitize and add year range filters if provided, only allowing 4-digit years
+        const ys = args.yearStart?.trim()
+        if (ys && /^\d{4}$/.test(ys)) {
+          url.searchParams.set('year_start', ys)
+        }
+        // sanitize and add year end filter if provided, only allowing 4-digit years
+        const ye = args.yearEnd?.trim()
+        if (ye && /^\d{4}$/.test(ye)) {
+          url.searchParams.set('year_end', ye)
+        }
 
         // calls the NASA API and transforms the results into our NasaSearchResult type 
         const res = await fetch(url.toString(), { headers: { accept: 'application/json' } })
@@ -50,18 +80,14 @@ export const schema = createSchema({
             const nasaId = d?.nasa_id
             if (!nasaId) return null
 
-            const thumbnail =
-              item?.links?.find((l: any) => l?.rel === 'preview')?.href ??
-              item?.links?.[0]?.href ??
-              null
-
             return {
               nasaId,
               title: d?.title ?? null,
-              description: d?.description ?? null,
+              keywords: d?.keywords ?? [],
+              yearStart: d?.year_start ?? null,
+              yearEnd: d?.year_end ?? null,
+              mediaType: d?.media_type ?? null,
               dateCreated: d?.date_created ?? null,
-              center: d?.center ?? null,
-              thumbnail,
             }
           })
           .filter(Boolean)
