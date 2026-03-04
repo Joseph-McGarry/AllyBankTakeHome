@@ -4,19 +4,23 @@
 ```bash 
 npm install
 ```
-2. Start the dev server 
+2. Enter project directory
+```bash 
+cd AllyBankTakeHome
+``` 
+3. Start the dev server 
 ```bash
-npm run dev`
+npm run dev
 ```
-3. Open GraphiQL
+4. Open GraphiQL
 - Navigate to: `http://localhost:4000/graphql`
-4. View available queries
+5. View available queries
     - Click the filing cabinet icon (top-left).
     - Under 'Root Types', click 'query: Query'
     - You should see:
         1. nasaSearch
         2. mediaDetails
-5. Run a query
+6. Run a query
 - Paste a query into the left panel.
 - Click the Play button (top-right).
 - Results will appear in the right panel.
@@ -196,7 +200,7 @@ I used GraphQL Yoga because it’s a lightweight way to stand up a GraphQL serve
 
 ### Structure
 
- - 'src/server.ts': boots the HTTP server and mounts the Yoga GraphQL endpoint (/graphql).
+- 'src/server.ts': boots the HTTP server and mounts the Yoga GraphQL endpoint (/graphql).
 - 'src/schema/schema.ts': contains the GraphQL schema typeDefs and resolvers.
 - 'docs/': contains documentation assets for ease of use
 
