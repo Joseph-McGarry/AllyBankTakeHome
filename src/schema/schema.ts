@@ -3,27 +3,38 @@ import { createSchema } from 'graphql-yoga'
 export const schema = createSchema({
   typeDefs: /* GraphQL */ `
     type Query {
-      nasaSearch(q: String!, mediaType: String = "image", page: Int = 1, keywords: [String], yearStart: String, yearEnd: String, dateCreated: String): [NasaSearchResult!]!
-      searchAsset(nasaId: ID!): NasaAssetResult
+      nasaSearch(
+        q: String!
+        mediaType: String = "image"
+        page: Int = 1 
+        keywords: [String] 
+        yearStart: String 
+        yearEnd: String 
+      ): [NasaSearchResult!]!
+      
+      mediaDetails(nasaId: ID!): MediaDetails!
     }
 
     type NasaSearchResult {
       nasaId: ID!
       title: String
       mediaType: String
-      keywords: [String]
+      keywords: [String!]!
       yearStart: String
       yearEnd: String
       dateCreated: String
     }
 
-    type NasaAssetResult {
+    type MediaDetails {
       nasaId: ID!
-      items: [NasaAssetItem!]!
-    }
-      
-    type NasaAssetItem {
-      href: String!
+      title: String
+      description: String
+      dateCreated: String
+      center: String
+      photographer: String
+      keywords: [String!]!
+      mediaUrls: [String!]!
+      metadataUrl: String
     }
   `,
   resolvers: {
@@ -83,7 +94,7 @@ export const schema = createSchema({
             return {
               nasaId,
               title: d?.title ?? null,
-              keywords: d?.keywords ?? [],
+              keywords: (d?.keywords ?? []).filter((k: any) => typeof k === 'string' && k.length > 0),
               yearStart: d?.year_start ?? null,
               yearEnd: d?.year_end ?? null,
               mediaType: d?.media_type ?? null,
@@ -93,21 +104,71 @@ export const schema = createSchema({
           .filter(Boolean)
       },
 
-      // resolver for retrieving asset manifest for a given NASA ID using the /asset endpoint
-      searchAsset: async (_: unknown, args: { nasaId: string }) => {
-      const url = new URL('https://images-api.nasa.gov/asset/' + args.nasaId)
 
-      const res = await fetch(url.toString(), { headers: { accept: 'application/json' } })
-        if (!res.ok) {
-          throw new Error(`NASA /asset failed: ${res.status} ${res.statusText}`)
+      // resolver for media detail aggregating using the /asset, /metadata and /search
+      // endpoints to get all details and media URLs for a given NASA ID
+      
+      mediaDetails: async (_: unknown, args: { nasaId: string }) => {
+        const metadataUrl = new URL('https://images-api.nasa.gov/metadata/' + args.nasaId)
+        const assetUrl = new URL('https://images-api.nasa.gov/asset/' + args.nasaId)
+        const searchUrl = new URL('https://images-api.nasa.gov/search')
+
+        searchUrl.searchParams.set('q', args.nasaId)
+
+        // fetch all endpoints in parallel
+        const [metadataRes, assetRes, searchRes] = await Promise.all([
+          fetch(metadataUrl.toString(), { headers: { accept: 'application/json' } }),
+          fetch(assetUrl.toString(), { headers: { accept: 'application/json' } }),
+          fetch(searchUrl.toString(), { headers: { accept: 'application/json' } })
+        ])
+
+        // asset is required
+        if (!assetRes.ok) {
+          throw new Error(`NASA /asset failed: ${assetRes.status} ${assetRes.statusText}`)
         }
 
-        const json = await res.json()
-        const rawItems = json?.collection?.items ?? [];
-        const items = rawItems.map((item: any) => ({
-          href: item?.href ?? null
-        }));
-        return { nasaId: args.nasaId, items };
+        // search is required for the enriched fields
+        if (!searchRes.ok) {
+          throw new Error(`NASA /search failed: ${searchRes.status} ${searchRes.statusText}`)
+        }
+
+        const assetJson = await assetRes.json()
+        const searchJson = await searchRes.json()
+
+        // metadata is optional since it may not exist for all items
+        const metadataJson = metadataRes.ok ? await metadataRes.json() : null
+
+        // extract media URLs from the asset endpoint response
+        const assetItems = assetJson?.collection?.items ?? []
+        const mediaUrls = assetItems
+          .map((i: any) => i?.href)
+          .filter((href: any) => typeof href === 'string' && href.length > 0)
+
+        // find the matching item from the search results using the NASA ID,
+        // falling back to the first item if not found
+        const searchItems = searchJson?.collection?.items ?? []
+        const match =
+          searchItems.find((it: any) => it?.data?.[0]?.nasa_id === args.nasaId) ?? searchItems[0]
+        const d = match?.data?.[0] ?? null
+
+        // try to find a metadata URL from the metadata endpoint response
+        const metaUrl =
+          metadataJson?.location ??
+          metadataJson?.collection?.items?.[0]?.href ??
+          metadataJson?.collection?.items?.[0]?.location ??
+          null
+
+        return {
+          nasaId: args.nasaId,
+          title: d?.title ?? null,
+          description: d?.description ?? null,
+          dateCreated: d?.date_created ?? null,
+          center: d?.center ?? null,
+          photographer: d?.photographer ?? null,
+          keywords: (d?.keywords ?? []).filter((k: any) => typeof k === 'string' && k.length > 0),
+          mediaUrls,
+          metadataUrl: metaUrl,
+        }
       },
     },
   },
